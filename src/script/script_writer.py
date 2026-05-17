@@ -174,12 +174,10 @@ class ScriptWriter:
     def save(self, script: dict, slug: str) -> Path:
         """Save script to disk as .json and .md files."""
         Config.ensure_dirs()
-        base = Config.scripts_dir() / slug
-
-        json_path = base.with_suffix(".json")
+        json_path = Config.scripts_dir() / "script.json"
         json_path.write_text(json.dumps(script, indent=2, ensure_ascii=False), encoding="utf-8")
 
-        md_path = base.with_name(slug + "_script.md")
+        md_path = Config.scripts_dir() / "script.md"
         md_path.write_text(_script_to_markdown(script), encoding="utf-8")
 
         return json_path

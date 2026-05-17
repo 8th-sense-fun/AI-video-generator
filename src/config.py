@@ -32,30 +32,49 @@ class Config:
     VIDEO_HEIGHT: int = int(os.getenv("VIDEO_HEIGHT", "720"))
     TARGET_DURATION_SECONDS: int = int(os.getenv("TARGET_DURATION_SECONDS", "240"))
 
-    # Derived output subdirs
+    # ── Per-run project folder ────────────────────────────────────────────────
+    # Set once at pipeline start via Config.set_run(slug).
+    # All output subdirs are then scoped under outputs/<slug>/
+    _run_slug: str = ""
+
+    @classmethod
+    def set_run(cls, slug: str) -> None:
+        """Set the active run slug — must be called before any dir methods."""
+        cls._run_slug = slug
+        cls.ensure_dirs()
+
+    @classmethod
+    def run_dir(cls) -> Path:
+        """Root folder for this run: outputs/<slug>/"""
+        if not cls._run_slug:
+            raise RuntimeError("Config.set_run(slug) must be called before accessing run_dir()")
+        return cls.OUTPUT_DIR / cls._run_slug
+
+    # ── Per-run subdirectories ────────────────────────────────────────────────
+
     @classmethod
     def research_dir(cls) -> Path:
-        return cls.OUTPUT_DIR / "research"
+        return cls.run_dir() / "research"
 
     @classmethod
     def scripts_dir(cls) -> Path:
-        return cls.OUTPUT_DIR / "scripts"
+        return cls.run_dir() / "scripts"
 
     @classmethod
     def audio_dir(cls) -> Path:
-        return cls.OUTPUT_DIR / "audio"
+        return cls.run_dir() / "audio"
 
     @classmethod
     def clips_dir(cls) -> Path:
-        return cls.OUTPUT_DIR / "clips"
+        return cls.run_dir() / "clips"
 
     @classmethod
     def final_dir(cls) -> Path:
-        return cls.OUTPUT_DIR / "final"
+        return cls.run_dir() / "final"
 
     @classmethod
     def ensure_dirs(cls) -> None:
-        """Create all output directories if they don't exist."""
+        """Create all output directories for the current run."""
         for d in [
             cls.research_dir(),
             cls.scripts_dir(),

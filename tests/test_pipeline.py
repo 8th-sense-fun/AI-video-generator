@@ -63,9 +63,10 @@ class TestConfig:
     def test_ensure_dirs_creates_directories(self, tmp_path):
         from src.config import Config
         with patch.object(Config, "OUTPUT_DIR", tmp_path / "outputs"):
+            Config.set_run("test_run")
             Config.ensure_dirs()
-            assert (tmp_path / "outputs" / "research").exists()
-            assert (tmp_path / "outputs" / "final").exists()
+            assert (tmp_path / "outputs" / "test_run" / "research").exists()
+            assert (tmp_path / "outputs" / "test_run" / "final").exists()
 
 
 # ── Utils tests ────────────────────────────────────────────────────────────────

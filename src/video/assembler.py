@@ -304,7 +304,7 @@ class VideoAssembler:
                               total_scenes + 2, total_scenes + 2)
 
         final = concatenate_videoclips(clips, method="compose")
-        output_path = Config.final_dir() / f"{slug}_final.mp4"
+        output_path = Config.final_dir() / "final.mp4"
 
         final.write_videofile(
             str(output_path),

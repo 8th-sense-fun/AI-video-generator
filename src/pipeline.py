@@ -36,7 +36,6 @@ class Pipeline:
 
     def __init__(self, tier: str = "a") -> None:
         self.tier = tier.lower()
-        Config.ensure_dirs()
 
     def _get_researcher(self):
         if self.tier == "a":
@@ -86,14 +85,28 @@ class Pipeline:
         import json
 
         slug = run_slug(topic)
+
+        # ── Set up per-run project folder ─────────────────────────────────────
+        Config.set_run(slug)
+        run_dir = Config.run_dir()
+
         console.print(f"\n[bold green]🎬 NotebookLM Auto Pipeline[/bold green]")
-        console.print(f"[dim]Topic:[/dim] [bold]{topic}[/bold]")
-        console.print(f"[dim]Tier:[/dim]  [bold]{self.tier.upper()}[/bold]   [dim]Run ID:[/dim] {slug}\n")
+        console.print(f"[dim]Topic:[/dim]   [bold]{topic}[/bold]")
+        console.print(f"[dim]Tier:[/dim]    [bold]{self.tier.upper()}[/bold]")
+        console.print(f"[dim]Run ID:[/dim]  {slug}")
+        console.print(f"[dim]Folder:[/dim]  {run_dir}\n")
 
         # ── Step 1: Research ──────────────────────────────────────────────────
         if skip_research:
-            console.print("[yellow]⏭  Skipping research (using cached data)[/yellow]")
-            research_data = json.loads(skip_research.read_text())
+            # Accept either a run folder or direct path to sources.json
+            skip_research = Path(skip_research)
+            sources_file = (
+                skip_research / "research" / "sources.json"
+                if skip_research.is_dir()
+                else skip_research
+            )
+            console.print(f"[yellow]⏭  Skipping research (using: {sources_file})[/yellow]")
+            research_data = json.loads(sources_file.read_text())
         else:
             with _make_progress() as progress:
                 task = progress.add_task("🔍 Researching topic...", total=None)
@@ -111,8 +124,15 @@ class Pipeline:
 
         # ── Step 2: Script Writing ────────────────────────────────────────────
         if skip_script:
-            console.print("[yellow]⏭  Skipping script writing (using cached script)[/yellow]")
-            script = json.loads(skip_script.read_text())
+            # Accept either a run folder or direct path to script.json
+            skip_script = Path(skip_script)
+            script_file = (
+                skip_script / "scripts" / "script.json"
+                if skip_script.is_dir()
+                else skip_script
+            )
+            console.print(f"[yellow]⏭  Skipping script writing (using: {script_file})[/yellow]")
+            script = json.loads(script_file.read_text())
         else:
             with _make_progress() as progress:
                 task = progress.add_task("✍️  Writing video script...", total=None)
@@ -174,6 +194,7 @@ class Pipeline:
             progress.update(task, description=f"✅ Video rendered!")
 
         console.print(f"\n[bold green]🎉 Done! Your video is ready:[/bold green]")
-        console.print(f"[bold white]   {final_path}[/bold white]\n")
+        console.print(f"[bold white]   {final_path}[/bold white]")
+        console.print(f"[dim]   All assets saved in: {run_dir}[/dim]\n")
 
         return final_path

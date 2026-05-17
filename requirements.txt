@@ -14,7 +14,7 @@ lxml==5.3.0
 groq==0.25.0
 
 # TTS (Narration)
-edge-tts==7.0.2
+edge-tts>=7.2.8
 pydub==0.25.1
 
 # Video / Images

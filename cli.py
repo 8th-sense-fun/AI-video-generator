@@ -57,13 +57,13 @@ def cli(ctx):
     "--skip-research",
     default=None,
     type=click.Path(exists=True, path_type=Path),
-    help="Skip research step — provide path to an existing research JSON file.",
+    help="Skip research — provide path to an existing run folder OR research/sources.json file.",
 )
 @click.option(
     "--skip-script",
     default=None,
     type=click.Path(exists=True, path_type=Path),
-    help="Skip script-writing step — provide path to an existing script JSON file.",
+    help="Skip script writing — provide path to an existing run folder OR scripts/script.json file.",
 )
 def run(topic, tier, voice, duration, skip_research, skip_script):
     """Run the full research-to-video pipeline for a topic."""

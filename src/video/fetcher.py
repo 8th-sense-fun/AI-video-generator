@@ -122,7 +122,7 @@ class VideoFetcher:
                     len(scenes),
                 )
 
-            video_path = Config.clips_dir() / f"{slug}_scene_{scene_num:02d}_raw.mp4"
+            video_path = Config.clips_dir() / f"scene_{scene_num:02d}_raw.mp4"
 
             # Skip if already downloaded
             if video_path.exists() and video_path.stat().st_size > 10_000:

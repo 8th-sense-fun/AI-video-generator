@@ -149,14 +149,14 @@ class DeepResearcher:
     def save(self, research_data: dict, slug: str) -> Path:
         """Save research to disk as .md and .json files."""
         Config.ensure_dirs()
-        base = Config.research_dir() / slug
+        base = Config.research_dir() / "report"
 
         # Save markdown report
         md_path = base.with_suffix(".md")
         md_path.write_text(research_data["full_report"], encoding="utf-8")
 
         # Save structured JSON (sources + metadata)
-        json_path = base.with_name(slug + "_sources.json")
+        json_path = Config.research_dir() / "sources.json"
         json_data = {
             "topic": research_data["topic"],
             "timestamp": research_data["timestamp"],
