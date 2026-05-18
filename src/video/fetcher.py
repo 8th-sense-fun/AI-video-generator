@@ -8,7 +8,6 @@ narration audio duration.
 
 from __future__ import annotations
 
-import random
 import time
 from pathlib import Path
 
@@ -25,7 +24,7 @@ _PEXELS_HEADERS = lambda: {"Authorization": Config.PEXELS_API_KEY}  # noqa: E731
 # ── Pexels search ─────────────────────────────────────────────────────────────
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=10))
-def _search_pexels(query: str, per_page: int = 15) -> list[dict]:
+def _search_pexels(query: str, per_page: int = 40) -> list[dict]:
     """Search Pexels for videos matching a query string. Returns list of video objects."""
     params = {
         "query": query,
@@ -38,24 +37,22 @@ def _search_pexels(query: str, per_page: int = 15) -> list[dict]:
     return resp.json().get("videos", [])
 
 
-def _pick_best_video(videos: list[dict], used_ids: set, min_duration: int = 10) -> dict | None:
+def _pick_best_video(videos: list[dict], used_ids: set) -> dict | None:
     """
-    Pick the best unused video from results.
-    Prefers HD, minimum duration, and clips not already used in this run.
+    Pick the most relevant unused video from results.
+
+    Pexels returns results sorted by relevance. This function takes the first
+    non-duplicate result, which is guaranteed to be the most relevant match.
     NEVER allows repeating a previously used video ID.
     """
     # Always filter out already-used video IDs — no fallback to repeats
     fresh = [v for v in videos if v.get("id") not in used_ids]
 
-    candidates = [v for v in fresh if v.get("duration", 0) >= min_duration]
-    if not candidates:
-        candidates = fresh  # Relax duration requirement but still no repeats
-
-    if not candidates:
+    if not fresh:
         return None
 
-    # Pick a random one from top 5 for variety
-    return random.choice(candidates[:5])
+    # Return the first (most relevant) non-duplicate result
+    return fresh[0]
 
 
 def _get_download_url(video: dict, preferred_quality: str = "hd") -> str | None:
@@ -119,7 +116,6 @@ class VideoFetcher:
             # Prefer the specific search query the LLM crafted; fall back to keywords
             search_query = scene.get("pexels_search_query") or " ".join(scene.get("pexels_keywords", ["nature"])[:3])
             keywords = scene.get("pexels_keywords", ["nature"])
-            duration_hint = scene.get("duration_hint", 20)
 
             if progress_callback:
                 progress_callback(
@@ -143,14 +139,12 @@ class VideoFetcher:
                     fallback_queries.append(keywords[0])
                     if len(keywords) > 1:
                         fallback_queries.append(keywords[1])
-                # Last resort: very generic terms related to geography/travel
-                fallback_queries += ["city landmark aerial", "nature landscape scenic", "travel destination"]
 
                 best = None
                 for attempt_query in fallback_queries:
-                    videos = _search_pexels(attempt_query, per_page=20)
+                    videos = _search_pexels(attempt_query)
                     if videos:
-                        best = _pick_best_video(videos, used_video_ids, min_duration=duration_hint)
+                        best = _pick_best_video(videos, used_video_ids)
                         if best:
                             break  # Found a fresh, unique clip
 

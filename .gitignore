@@ -1,4 +1,5 @@
 venv/
+venv_test/
 .env
 outputs/
 __pycache__/
