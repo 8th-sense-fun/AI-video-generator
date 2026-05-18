@@ -3,13 +3,13 @@ Video assembler — merges per-scene audio + video clips into a final
 cinematic educational video using MoviePy.
 
 Pipeline per scene:
-  1. Load stock video clip → loop/trim to match audio duration
-  2. Add subtle Ken Burns zoom effect for visual interest
+  1. Load stock video clip → stretch/loop to match audio duration
+  2. Resize to target resolution
   3. Overlay narration audio
-  4. Add title card at scene start (lower third)
-  5. Add subtle background music bed
+  4. Add lower-third title card at scene start
+  5. Crossfade between scenes
 
-Final output: one clean MP4 with no watermarks.
+Final output: one clean MP4, no watermarks.
 """
 
 from __future__ import annotations
@@ -21,14 +21,12 @@ import numpy as np
 from moviepy import (
     AudioFileClip,
     ColorClip,
-    CompositeAudioClip,
     CompositeVideoClip,
     ImageClip,
-    TextClip,
     VideoFileClip,
     concatenate_videoclips,
-    concatenate_audioclips,
     afx,
+    vfx,
 )
 from PIL import Image, ImageDraw, ImageFont
 
@@ -42,7 +40,18 @@ H = Config.VIDEO_HEIGHT   # 720
 FPS = 24
 FONT_SIZE_TITLE = 38
 FONT_SIZE_SCENE = 28
-FADE_DURATION = 0.8       # seconds for fade in/out between scenes
+
+# Complexity-driven constants — resolved at assemble time from Config.COMPLEXITY
+_COMPLEXITY_PRESETS = {
+    #                fade    lower_third_secs  intro_dur  outro_dur
+    "simple":     (0.3,     3.0,              2.5,       3.0),
+    "normal":     (0.8,     4.0,              3.5,       4.0),
+    "cinematic":  (1.2,     6.0,              5.0,       5.0),
+}
+
+def _get_preset():
+    key = getattr(Config, "COMPLEXITY", "normal").lower()
+    return _COMPLEXITY_PRESETS.get(key, _COMPLEXITY_PRESETS["normal"])
 
 
 # ── Helper: PIL-based text image (fallback for systems without fonts) ─────────
@@ -140,18 +149,70 @@ def _make_lower_third(scene_title: str, duration: float) -> ImageClip:
         ImageClip(bar_arr)
         .with_duration(min(duration, 4.0))  # Show for max 4s
         .with_position((20, H - bar_arr.shape[0] - 20))
-        .with_effects([afx.AudioFadeIn(0.3)])  # Reuse fade for image (handled in compose)
+        .with_effects([vfx.FadeIn(0.3)])
     )
 
+def _stretch_clip_to_duration(raw_video: VideoFileClip, target_duration: float) -> VideoFileClip:
+    """
+    Intelligently extend a clip to fill target_duration without jarring repeats.
 
-# ── Scene assembler ───────────────────────────────────────────────────────────
+    Strategy:
+    - If clip is ≥70% of target: apply a slow Ken Burns zoom (scale 1.0→1.06) to pad time.
+    - If clip is shorter: extract several non-overlapping random-start sub-segments,
+      each a different portion of the clip, and concatenate them — so the viewer sees
+      different parts of the same clip rather than the same segment looping.
+    """
+    clip_dur = raw_video.duration
+
+    if clip_dur >= target_duration:
+        # Clip is long enough — just trim
+        return raw_video.subclipped(0, target_duration)
+
+    if clip_dur >= target_duration * 0.55:
+        # Close enough — slow zoom to pad the remaining time visually
+        # (MoviePy resize with a time-varying lambda for Ken Burns)
+        zoom_clip = raw_video.resized(lambda t: 1.0 + 0.06 * (t / clip_dur))
+        # Loop once more if still short, then trim
+        if zoom_clip.duration < target_duration:
+            from moviepy import concatenate_videoclips as _cv
+            zoom_clip = _cv([zoom_clip, zoom_clip]).subclipped(0, target_duration)
+        return zoom_clip.subclipped(0, target_duration)
+
+    # Clip is genuinely short — build non-overlapping sub-segments
+    from moviepy import concatenate_videoclips as _cv
+    segments = []
+    accumulated = 0.0
+    seg_len = min(clip_dur * 0.8, 6.0)   # Each segment = up to 6s or 80% of clip
+    max_start = max(0.0, clip_dur - seg_len - 0.1)
+
+    # Generate start offsets spread across the clip so they look different
+    import random as _random
+    step = max_start / max(1, int(target_duration / seg_len) + 1)
+    starts = [min(i * step, max_start) for i in range(int(target_duration / seg_len) + 3)]
+    # Shuffle slightly so adjacent segments don't march in order
+    _random.shuffle(starts)
+
+    for start in starts:
+        if accumulated >= target_duration:
+            break
+        end = min(start + seg_len, clip_dur)
+        seg = raw_video.subclipped(start, end)
+        segments.append(seg)
+        accumulated += seg.duration
+
+    if not segments:
+        segments = [raw_video]
+
+    stretched = _cv(segments)
+    return stretched.subclipped(0, min(target_duration, stretched.duration))
+
 
 def _build_scene_clip(
-    video_path: Path,
-    audio_path: Path,
+    video_path: "Path | None",
+    audio_path: "Path | None",
     scene_title: str,
     scene_number: int,
-) -> CompositeVideoClip | None:
+) -> "CompositeVideoClip | None":
     """
     Assemble a single scene: stock video + narration audio + lower-third title.
     Returns None if any required file is missing.
@@ -165,16 +226,11 @@ def _build_scene_clip(
     audio = AudioFileClip(str(audio_path))
     target_duration = audio.duration + 0.5  # Small tail for breathing room
 
-    # Load and loop/trim video to match audio
+    fade_dur, lower_third_secs, _, _ = _get_preset()
+
+    # Load and stretch/loop video to match audio duration
     raw_video = VideoFileClip(str(video_path), audio=False)
-    if raw_video.duration < target_duration:
-        # Loop the clip
-        loops_needed = int(target_duration / raw_video.duration) + 2
-        from moviepy import concatenate_videoclips as cv
-        looped = cv([raw_video] * loops_needed)
-        video_clip = looped.subclipped(0, target_duration)
-    else:
-        video_clip = raw_video.subclipped(0, target_duration)
+    video_clip = _stretch_clip_to_duration(raw_video, target_duration)
 
     # Resize to target resolution
     video_clip = video_clip.resized((W, H))
@@ -182,14 +238,14 @@ def _build_scene_clip(
     # Add narration audio
     video_clip = video_clip.with_audio(audio)
 
-    # Add lower-third title overlay (first 4 seconds)
-    lower_third = _make_lower_third(scene_title, target_duration)
+    # Add lower-third title overlay
+    lower_third = _make_lower_third(scene_title, min(target_duration, lower_third_secs))
     composed = CompositeVideoClip([video_clip, lower_third])
 
-    # Fade in/out
+    # Fade in/out (video fades, not audio-only fades)
     composed = composed.with_effects([
-        afx.AudioFadeIn(FADE_DURATION),
-        afx.AudioFadeOut(FADE_DURATION),
+        vfx.FadeIn(fade_dur),
+        vfx.FadeOut(fade_dur),
     ])
 
     return composed.with_duration(target_duration)
@@ -228,17 +284,17 @@ class VideoAssembler:
         progress_callback=None,
     ) -> Path:
         """
-        Combine all scenes into a final MP4.
+        Combine all scene clips into a final MP4.
 
         Args:
-            script: Script dict from ScriptWriter
-            audio_results: List of {scene_number, audio_path} from Narrator
-            video_results: List of {scene_number, video_path} from VideoFetcher
-            slug: Unique run identifier
-            progress_callback: Optional callable(message, step, total)
+            script:          Parsed script dict from ScriptWriter.
+            audio_results:   List of {scene_number, audio_path} from Narrator.
+            video_results:   List of {scene_number, video_path} from VideoFetcher.
+            slug:            Unique run identifier (used only for logging here).
+            progress_callback: Optional callable(message, step, total).
 
         Returns:
-            Path to the final output video
+            Path to the rendered final.mp4.
         """
         Config.ensure_dirs()
         scenes = script.get("scenes", [])
@@ -253,10 +309,11 @@ class VideoAssembler:
         # 1. Intro title card
         if progress_callback:
             progress_callback("Building intro card...", 0, total_scenes + 2)
+        _, _, intro_dur, outro_dur = _get_preset()
         intro = _make_intro_card(
             script.get("title", script.get("topic", "Educational Video")),
             script.get("hook_fact", ""),
-            duration=3.5,
+            duration=intro_dur,
         )
         clips.append(intro)
 
@@ -292,6 +349,7 @@ class VideoAssembler:
         outro = _make_outro_card(
             topic=script.get("title", ""),
             sources_count=len(script.get("scenes", [])),
+            duration=outro_dur,
         )
         clips.append(outro)
 
@@ -304,6 +362,7 @@ class VideoAssembler:
                               total_scenes + 2, total_scenes + 2)
 
         final = concatenate_videoclips(clips, method="compose")
+
         output_path = Config.final_dir() / "final.mp4"
 
         final.write_videofile(

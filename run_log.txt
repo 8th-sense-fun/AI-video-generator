@@ -1,0 +1,55 @@
+╭────────────────────────────────────────────────────────────────────────── 🎬 NotebookLM Auto ──────────────────────────────────────────────────────────────────────────╮
+│ Topic: The ranking of 10 most visited places on earth that you must go in life                                                                                         │
+│ Tier:  A (Free)                                                                                                                                                        │
+│ Voice: en-US-GuyNeural                                                                                                                                                 │
+│ Duration: ~5 min (300s)                                                                                                                                                │
+│ Scenes: 10                                                                                                                                                             │
+│ Complexity: cinematic                                                                                                                                                  │
+│ Music: off                                                                                                                                                             │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+🎬 NotebookLM Auto Pipeline
+Topic:   The ranking of 10 most visited places on earth that you must go in life
+Tier:    A
+Run ID:  the_ranking_of_10_most_visited_places_on_earth_tha_20260517_134219
+Folder:  /Users/pengzhao/Documents/Projects/git_repos/NotebookLM_auto/outputs/the_ranking_of_10_most_visited_places_on_earth_tha_20260517_134219
+
+⠙ ✅ Research complete — 12 sources 0:00:39
+
+📚 Sources Found:
+────────────────────────────────────────────────────────────────────────────────
+   1. [1.00] The 10 Best Cities In The World To Visit In 2026—According T
+       https://www.forbes.com/sites/laurabegleybloom/2025/12/22/the-10-best-c
+   2. [1.00] Top 10 Places To Visit in 2026 (Year of Travel)
+       https://www.youtube.com/watch?v=pZ7WLQbLDn8
+   3. [1.00] 30 World's Best Places to Visit for 2026 | U.S. News Travel
+       https://travel.usnews.com/rankings/worlds-best-vacations/
+   4. [1.00] Top 10 most visited countries in the world in 2026 - Busines
+       https://businessday.ng/life-arts/article/top-10-most-visited-countries
+   5. [1.00] The 10 most popular travel destinations for 2026, according 
+       https://www.southwestvoices.news/premium/stacker/stories/the-10-most-p
+   6. [0.99] Top-100 Must-See Places in the World - Eugene Kaspersky's
+       https://eugene.kaspersky.com/top-100-must-see-places-in-the-world/
+   7. [0.99] Top Ten Most Visited Tourist Attractions in The World - John
+       https://johnnyafrica.com/top-ten-most-visited-tourist-attractions-in-t
+   8. [0.98] Why and where do we travel? - Tourism & sustainability
+       https://travelandclimate.org/tourism-sustainability/why-and-where-do-w
+   9. [0.95] The 25 Best Places to Go in 2025 | Condé Nast Traveler
+       https://www.cntraveler.com/story/best-places-to-go-in-2025
+  10. [0.95] 20 bucket list places you need to visit at least once in you
+       https://postcardsfromtheworld.com/20-bucket-list-places-to-visit-at-le
+  11. [0.88] I've Been to 175 Countries. Here are the 50 Best Places to S
+       https://rtwin30days.com/travel-bucket-list/
+  12. [0.72] Social Impact of Travel and Tourism
+       https://wttc.org/social-impact
+────────────────────────────────────────────────────────────────────────────────
+Research saved to: 
+/Users/pengzhao/Documents/Projects/git_repos/NotebookLM_auto/outputs/the_ranking_of_10_most_visited_places_on_earth_tha_20260517_134219/research/report.md
+
+⠴ ✍️  Writing cinematic video script with Llama 3.3... 0:00:04
+╭────────────────────────────────────────────────────────────────────────── ❌ Pipeline Error ───────────────────────────────────────────────────────────────────────────╮
+│ RetryError: RetryError[<Future at 0x1132641d0 state=finished raised RateLimitError>]                                                                                   │
+│                                                                                                                                                                        │
+│ Check outputs/ folder for any partially completed files.                                                                                                               │
+│ You can resume using --skip-research or --skip-script flags.                                                                                                           │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

@@ -51,7 +51,24 @@ def cli(ctx):
     "--duration", "-d",
     default=None,
     type=int,
-    help="Target video duration in seconds (default: 240 = 4 min). Range: 180–300.",
+    help="Target video duration in seconds (default: 240 = 4 min). E.g. 300 = 5 min.",
+)
+@click.option(
+    "--scenes", "-s",
+    default=None,
+    type=int,
+    help="Number of scenes to generate (default: auto based on duration). E.g. 10 for a 5-min video.",
+)
+@click.option(
+    "--complexity", "-c",
+    default=None,
+    type=click.Choice(["simple", "normal", "cinematic"], case_sensitive=False),
+    help=(
+        "Visual complexity preset (default: normal).\n"
+        "  simple    — plain cuts, no Ken Burns, minimal overlays\n"
+        "  normal    — subtle zoom, lower-thirds, fades (default)\n"
+        "  cinematic — strong Ken Burns, longer title cards, richer fades"
+    ),
 )
 @click.option(
     "--skip-research",
@@ -65,7 +82,7 @@ def cli(ctx):
     type=click.Path(exists=True, path_type=Path),
     help="Skip script writing — provide path to an existing run folder OR scripts/script.json file.",
 )
-def run(topic, tier, voice, duration, skip_research, skip_script):
+def run(topic, tier, voice, duration, scenes, complexity, skip_research, skip_script):
     """Run the full research-to-video pipeline for a topic."""
 
     # Apply overrides
@@ -73,6 +90,10 @@ def run(topic, tier, voice, duration, skip_research, skip_script):
         Config.DEFAULT_TIER = tier
     if duration:
         Config.TARGET_DURATION_SECONDS = max(60, min(600, duration))
+    if scenes:
+        Config.TARGET_SCENE_COUNT = max(3, min(20, scenes))
+    if complexity:
+        Config.COMPLEXITY = complexity.lower()
     effective_tier = tier or Config.DEFAULT_TIER
 
     # Validate API keys
@@ -94,7 +115,9 @@ def run(topic, tier, voice, duration, skip_research, skip_script):
             f"[bold cyan]Topic:[/bold cyan] {topic}\n"
             f"[bold cyan]Tier:[/bold cyan]  {effective_tier.upper()} ({'Free' if effective_tier == 'a' else 'Paid'})\n"
             f"[bold cyan]Voice:[/bold cyan] {voice or Config.DEFAULT_VOICE}\n"
-            f"[bold cyan]Duration:[/bold cyan] ~{Config.TARGET_DURATION_SECONDS // 60} min",
+            f"[bold cyan]Duration:[/bold cyan] ~{Config.TARGET_DURATION_SECONDS // 60} min ({Config.TARGET_DURATION_SECONDS}s)\n"
+            f"[bold cyan]Scenes:[/bold cyan] {'auto' if not Config.TARGET_SCENE_COUNT else Config.TARGET_SCENE_COUNT}\n"
+            f"[bold cyan]Complexity:[/bold cyan] {Config.COMPLEXITY}",
             title="🎬 NotebookLM Auto",
             border_style="cyan",
         )
@@ -176,6 +199,8 @@ def check():
         ("Tier A: PEXELS_API_KEY", Config.PEXELS_API_KEY, "pexels"),
         ("Default Voice", Config.DEFAULT_VOICE, None),
         ("Target Duration", f"{Config.TARGET_DURATION_SECONDS}s (~{Config.TARGET_DURATION_SECONDS//60} min)", None),
+        ("Target Scenes", str(Config.TARGET_SCENE_COUNT) if Config.TARGET_SCENE_COUNT else "auto", None),
+        ("Complexity", Config.COMPLEXITY, None),
         ("Video Resolution", f"{Config.VIDEO_WIDTH}×{Config.VIDEO_HEIGHT}", None),
         ("Output Directory", str(Config.OUTPUT_DIR), None),
     ]

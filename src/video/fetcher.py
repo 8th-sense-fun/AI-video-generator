@@ -25,9 +25,8 @@ _PEXELS_HEADERS = lambda: {"Authorization": Config.PEXELS_API_KEY}  # noqa: E731
 # ── Pexels search ─────────────────────────────────────────────────────────────
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=10))
-def _search_pexels(keywords: list[str], per_page: int = 10) -> list[dict]:
-    """Search Pexels for videos matching keywords. Returns list of video objects."""
-    query = " ".join(keywords[:3])  # Use top 3 keywords
+def _search_pexels(query: str, per_page: int = 15) -> list[dict]:
+    """Search Pexels for videos matching a query string. Returns list of video objects."""
     params = {
         "query": query,
         "per_page": per_page,
@@ -39,14 +38,18 @@ def _search_pexels(keywords: list[str], per_page: int = 10) -> list[dict]:
     return resp.json().get("videos", [])
 
 
-def _pick_best_video(videos: list[dict], min_duration: int = 10) -> dict | None:
+def _pick_best_video(videos: list[dict], used_ids: set, min_duration: int = 10) -> dict | None:
     """
-    Pick the best video from results.
-    Prefers HD, minimum duration, landscape orientation.
+    Pick the best unused video from results.
+    Prefers HD, minimum duration, and clips not already used in this run.
+    NEVER allows repeating a previously used video ID.
     """
-    candidates = [v for v in videos if v.get("duration", 0) >= min_duration]
+    # Always filter out already-used video IDs — no fallback to repeats
+    fresh = [v for v in videos if v.get("id") not in used_ids]
+
+    candidates = [v for v in fresh if v.get("duration", 0) >= min_duration]
     if not candidates:
-        candidates = videos  # Fallback: take any
+        candidates = fresh  # Relax duration requirement but still no repeats
 
     if not candidates:
         return None
@@ -109,15 +112,18 @@ class VideoFetcher:
         """
         scenes = script.get("scenes", [])
         results = []
+        used_video_ids: set = set()  # Track used Pexels IDs to prevent cross-scene repeats
 
         for i, scene in enumerate(scenes):
             scene_num = scene["scene_number"]
+            # Prefer the specific search query the LLM crafted; fall back to keywords
+            search_query = scene.get("pexels_search_query") or " ".join(scene.get("pexels_keywords", ["nature"])[:3])
             keywords = scene.get("pexels_keywords", ["nature"])
             duration_hint = scene.get("duration_hint", 20)
 
             if progress_callback:
                 progress_callback(
-                    f"Fetching video: Scene {scene_num} — keywords: {', '.join(keywords[:2])}",
+                    f"Fetching video: Scene {scene_num} — \"{search_query[:50]}\"",
                     i + 1,
                     len(scenes),
                 )
@@ -130,25 +136,35 @@ class VideoFetcher:
                 continue
 
             try:
-                videos = _search_pexels(keywords, per_page=10)
+                # Build a list of progressively broader fallback queries
+                fallback_queries = [search_query]
+                if keywords:
+                    fallback_queries.append(" ".join(keywords[:3]))
+                    fallback_queries.append(keywords[0])
+                    if len(keywords) > 1:
+                        fallback_queries.append(keywords[1])
+                # Last resort: very generic terms related to geography/travel
+                fallback_queries += ["city landmark aerial", "nature landscape scenic", "travel destination"]
 
-                # If no results, try broader single keyword
-                if not videos and keywords:
-                    videos = _search_pexels([keywords[0]], per_page=10)
+                best = None
+                for attempt_query in fallback_queries:
+                    videos = _search_pexels(attempt_query, per_page=20)
+                    if videos:
+                        best = _pick_best_video(videos, used_video_ids, min_duration=duration_hint)
+                        if best:
+                            break  # Found a fresh, unique clip
 
-                if not videos:
-                    raise RuntimeError(f"No Pexels results for: {keywords}")
-
-                best = _pick_best_video(videos, min_duration=duration_hint)
                 if not best:
-                    best = videos[0]
+                    raise RuntimeError(f"No unique Pexels clip found after all fallbacks for: {search_query!r}")
+
+                # Record this video ID so no other scene reuses it
+                used_video_ids.add(best["id"])
 
                 url = _get_download_url(best)
                 if not url:
                     raise RuntimeError("Could not find download URL")
 
                 _download_file(url, video_path)
-
                 results.append({"scene_number": scene_num, "video_path": video_path})
 
             except Exception as exc:

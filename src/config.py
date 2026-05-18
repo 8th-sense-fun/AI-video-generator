@@ -10,31 +10,32 @@ load_dotenv(_root / ".env")
 
 
 class Config:
-    # API Keys
+    # ── API Keys (Tier A — all free) ──────────────────────────────────────────
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     PEXELS_API_KEY: str = os.getenv("PEXELS_API_KEY", "")
-    GOOGLE_AI_API_KEY: str = os.getenv("GOOGLE_AI_API_KEY", "")
-    PERPLEXITY_API_KEY: str = os.getenv("PERPLEXITY_API_KEY", "")
-    ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
-    TOGETHER_API_KEY: str = os.getenv("TOGETHER_API_KEY", "")
+    PIXABAY_API_KEY: str = os.getenv("PIXABAY_API_KEY", "")  # reserved for future fallback
 
-    # Pipeline
+    # ── Pipeline defaults ─────────────────────────────────────────────────────
     DEFAULT_TIER: str = os.getenv("DEFAULT_TIER", "a")
     DEFAULT_VOICE: str = os.getenv("DEFAULT_VOICE", "en-US-GuyNeural")
 
-    # Paths
+    # ── Paths ─────────────────────────────────────────────────────────────────
     ROOT_DIR: Path = _root
     OUTPUT_DIR: Path = _root / os.getenv("OUTPUT_DIR", "outputs")
 
-    # Video settings
+    # ── Video settings ────────────────────────────────────────────────────────
     VIDEO_WIDTH: int = int(os.getenv("VIDEO_WIDTH", "1280"))
     VIDEO_HEIGHT: int = int(os.getenv("VIDEO_HEIGHT", "720"))
     TARGET_DURATION_SECONDS: int = int(os.getenv("TARGET_DURATION_SECONDS", "240"))
+    # 0 = let the LLM decide based on duration; set explicitly to fix scene count
+    TARGET_SCENE_COUNT: int = int(os.getenv("TARGET_SCENE_COUNT", "0"))
+    # Visual complexity preset: simple | normal | cinematic
+    COMPLEXITY: str = os.getenv("COMPLEXITY", "normal")
 
     # ── Per-run project folder ────────────────────────────────────────────────
     # Set once at pipeline start via Config.set_run(slug).
-    # All output subdirs are then scoped under outputs/<slug>/
+    # All output subdirs are scoped under outputs/<slug>/
     _run_slug: str = ""
 
     @classmethod
@@ -86,19 +87,14 @@ class Config:
 
     @classmethod
     def validate(cls, tier: str) -> list[str]:
-        """Return list of missing keys for the given tier."""
+        """Return list of missing env-var names for the given tier."""
         missing = []
-        if tier in ("a",):
-            if not cls.TAVILY_API_KEY or "your-key" in cls.TAVILY_API_KEY:
-                missing.append("TAVILY_API_KEY")
-            if not cls.GROQ_API_KEY or "your-key" in cls.GROQ_API_KEY:
-                missing.append("GROQ_API_KEY")
-            if not cls.PEXELS_API_KEY or "your-key" in cls.PEXELS_API_KEY:
-                missing.append("PEXELS_API_KEY")
-        elif tier in ("b",):
-            if not cls.PERPLEXITY_API_KEY:
-                missing.append("PERPLEXITY_API_KEY")
-        elif tier in ("c",):
-            if not cls.GOOGLE_AI_API_KEY:
-                missing.append("GOOGLE_AI_API_KEY")
+        if tier == "a":
+            for name, val in [
+                ("TAVILY_API_KEY", cls.TAVILY_API_KEY),
+                ("GROQ_API_KEY", cls.GROQ_API_KEY),
+                ("PEXELS_API_KEY", cls.PEXELS_API_KEY),
+            ]:
+                if not val or "your-key" in val:
+                    missing.append(name)
         return missing
